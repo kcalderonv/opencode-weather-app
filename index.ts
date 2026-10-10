@@ -1,6 +1,6 @@
 import * as readline from "node:readline";
 import { loadState, saveState } from "./storage.ts";
-import { geocode, getCurrentWeather } from "./services/open-meteo.ts";
+import { geocode, getCurrentWeather, getDailyForecast } from "./services/open-meteo.ts";
 import { bold, cyan, green, red, yellow } from "./colors.ts";
 import type { City, State, Unit } from "./types.ts";
 
@@ -72,6 +72,18 @@ function formatCity(city: City): string {
   return parts.join(", ");
 }
 
+const WEEKDAYS = ["dom", "lun", "mar", "mié", "jue", "vie", "sáb"] as const;
+
+// "2026-10-10" -> "sáb 10/10". Se construye por partes porque new Date(iso)
+// interpretaría la fecha en UTC y podría correr el día según la zona horaria
+// de quien corre la app.
+function formatForecastDate(date: string): string {
+  const [year, month, day] = date.split("-");
+  if (year === undefined || month === undefined || day === undefined) return date;
+  const weekday = WEEKDAYS[new Date(Number(year), Number(month) - 1, Number(day)).getDay()];
+  return `${weekday ?? date} ${day}/${month}`;
+}
+
 function renderMenu(state: State): void {
   const lines = [
     cyan(BORDER),
@@ -82,6 +94,7 @@ function renderMenu(state: State): void {
     "  3. Buscar y agregar ciudad",
     "  4. Eliminar ciudad",
     "  5. Establecer ciudad default",
+    "  6. Pronóstico 7 días",
     `  8. Ajustes (${unitSymbol(state.unit)})`,
     "  9. Salir",
     cyan(BORDER),
@@ -197,6 +210,21 @@ function toggleUnit(state: State): void {
   console.log(green(`  Unidad establecida: ${unitSymbol(state.unit)}`));
 }
 
+async function showForecast(state: State): Promise<void> {
+  if (state.cities.length === 0) {
+    console.log(red("  No hay ciudades guardadas. Usá la opción 3 para agregar una."));
+    return;
+  }
+  const chosen = await pickCity(state.cities, "  ¿De qué ciudad querés el pronóstico? (número, Enter para cancelar): ");
+  if (chosen === null) return;
+  const forecast = await getDailyForecast(chosen.latitude, chosen.longitude, state.unit);
+  console.log(`  Pronóstico 7 días — ${formatCity(chosen)}`);
+  const unit = unitSymbol(state.unit);
+  for (const day of forecast) {
+    console.log(`  ${cyan(formatForecastDate(day.date))}   máx ${yellow(`${day.max} ${unit}`)}   mín ${yellow(`${day.min} ${unit}`)}`);
+  }
+}
+
 // --- Loop principal ---------------------------------------------------------
 
 async function main(): Promise<void> {
@@ -226,6 +254,9 @@ async function main(): Promise<void> {
         case "5":
           await setDefaultCity(state);
           break;
+        case "6":
+          await showForecast(state);
+          break;
         case "8":
           toggleUnit(state);
           break;
@@ -234,7 +265,7 @@ async function main(): Promise<void> {
           console.log("  ¡Chau!");
           break;
         default:
-          console.log(red("  Opción inválida. Elegí 1, 2, 3, 4, 5, 8 o 9."));
+          console.log(red("  Opción inválida. Elegí 1, 2, 3, 4, 5, 6, 8 o 9."));
       }
     } catch (err) {
       console.log(red(`  ${err instanceof Error ? err.message : "Ocurrió un error inesperado."}`));

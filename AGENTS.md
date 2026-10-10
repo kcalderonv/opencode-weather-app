@@ -14,10 +14,11 @@ Weather CLI practice project: an interactive console app that looks up city weat
 
 ## API flow (no key required)
 
-Two chained OpenMeteo calls, no auth or env vars needed:
+OpenMeteo calls, no auth or env vars needed:
 
-1. Geocoding: `https://geocoding-api.open-meteo.com/v1/search?name=<city>&count=1&language=es&format=json`
-2. Forecast: `https://api.open-meteo.com/v1/forecast?latitude=<lat>&longitude=<lon>&current=temperature_2m`
+1. Geocoding (city search — the app requests `count=5`, `language=es`): `https://geocoding-api.open-meteo.com/v1/search?name=<city>&count=5&language=es&format=json`
+2. Current weather: `https://api.open-meteo.com/v1/forecast?latitude=<lat>&longitude=<lon>&current=temperature_2m&temperature_unit=<celsius|fahrenheit>`
+3. 7-day forecast (menu option 6): same forecast URL with `daily=temperature_2m_max,temperature_2m_min&timezone=auto&forecast_days=7` — `timezone=auto` matters so days are local to the city
 
 ## Conventions
 
