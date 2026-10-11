@@ -7,36 +7,45 @@ import type { City } from "../types/City.ts";
 // de forma determinística (ask() devuelve null).
 // Las líneas se encolan para que también funcione con varias líneas de golpe
 // (redirección de archivo o pegado de varias líneas en la terminal).
-const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+// La interfaz de readline se crea en el primer ask() (inicialización lazy)
+// para que importar este módulo (menu → actions → input) no toque stdin: los
+// tests pueden importar el menú sin apropiarse de la terminal.
 
 const inputLines: string[] = [];
 let resolveLine: ((value: string | null) => void) | null = null;
 let inputClosed = false;
+let rl: readline.Interface | null = null;
 
-rl.on("line", (rawLine) => {
-  const line = rawLine.trim();
-  if (resolveLine !== null) {
-    const resolve = resolveLine;
-    resolveLine = null;
-    resolve(line);
-  } else {
-    inputLines.push(line);
+function getReadline(): readline.Interface {
+  if (rl === null) {
+    rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+    rl.on("line", (rawLine) => {
+      const line = rawLine.trim();
+      if (resolveLine !== null) {
+        const resolve = resolveLine;
+        resolveLine = null;
+        resolve(line);
+      } else {
+        inputLines.push(line);
+      }
+    });
+    rl.on("close", () => {
+      inputClosed = true;
+      if (resolveLine !== null) {
+        const resolve = resolveLine;
+        resolveLine = null;
+        resolve(null);
+      }
+    });
   }
-});
-
-rl.on("close", () => {
-  inputClosed = true;
-  if (resolveLine !== null) {
-    const resolve = resolveLine;
-    resolveLine = null;
-    resolve(null);
-  }
-});
+  return rl;
+}
 
 const isInteractive = process.stdin.isTTY === true;
 
 /** Escribe el prompt y lee una línea; null si la entrada se cerró (EOF). */
 export function ask(prompt: string): Promise<string | null> {
+  getReadline(); // inicializa la escucha de stdin en el primer uso
   const queued = inputLines.shift();
   if (queued !== undefined) {
     process.stdout.write(prompt);
@@ -76,5 +85,5 @@ export async function pickCity(cities: City[], prompt: string): Promise<City | n
 
 /** Cierra la entrada (al salir de la app). */
 export function closeInput(): void {
-  rl.close();
+  rl?.close();
 }

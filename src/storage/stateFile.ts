@@ -15,7 +15,10 @@ export function readStateFile(): StateFileResult {
   if (!existsSync(STATE_FILE)) return { exists: false, corrupted: false, data: null };
   try {
     const parsed = JSON.parse(readFileSync(STATE_FILE, "utf8")) as unknown;
-    const data = typeof parsed === "object" && parsed !== null ? (parsed as Partial<State>) : null;
+    const data =
+      typeof parsed === "object" && parsed !== null && !Array.isArray(parsed)
+        ? (parsed as Partial<State>)
+        : null;
     return { exists: true, corrupted: false, data };
   } catch {
     return { exists: true, corrupted: true, data: null };

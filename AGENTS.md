@@ -11,10 +11,11 @@ All source lives in `src/` with a thin entry (`src/index.ts`: load state → ren
 - Bun only (`bun.lock`; no npm/yarn). Scripts in `package.json`:
   - `bun run dev` — run from source with auto-restart on changes (`bun --watch`; stays alive after the app exits, stop with Ctrl+C)
   - `bun run start` — run from source
-  - `bun run build` — compile the standalone binary `weather.exe` (`bun build --compile src/index.ts --outfile weather`). The `run` matters: plain `bun build` (like `bun test`) is Bun's own built-in command and ignores the script
+  - `bun run build` — run the tests and, if they all pass, compile the standalone binary `weather.exe` (`bun test && bun build --compile src/index.ts --outfile weather`; a failing test aborts without compiling). The `run` matters: plain `bun build` (like `bun test`) is Bun's own built-in command and ignores the script
   - Install deps: `bun install`
   - Typecheck: `bunx tsc --noEmit` (`tsconfig.json` is strict, `noEmit`; Bun runs TS directly, no build step needed)
-- No tests, lint, or CI are configured; verify changes by running the CLI. For non-interactive runs, redirect a file via cmd (`cmd /c "bun run start < input.txt"`): PowerShell pipes never close stdin, so the app would wait forever. EOF exits cleanly.
+  - Tests: `bun test` (suite in `tests/`, mirroring `src/`); single file: `bun test tests/utils/format.test.ts`. API tests stub `globalThis.fetch` via `tests/api/mockFetch.ts`, storage tests `process.chdir` into a temp dir, and `tests/smoke.test.ts` spawns the app with `Bun.spawn` (no network)
+- No lint or CI is configured; verify changes with `bun test` plus a manual CLI run. For non-interactive app runs, redirect a file via cmd (`cmd /c "bun run start < input.txt"`): PowerShell pipes never close stdin, so the app would wait forever. EOF exits cleanly.
 
 ## API flow (no key required)
 
