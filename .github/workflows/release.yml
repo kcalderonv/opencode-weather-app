@@ -1,0 +1,51 @@
+name: Release
+
+on:
+  workflow_dispatch: {} # se lanza manualmente desde la pestaña Actions
+
+permissions:
+  contents: write # necesario para crear el tag y el release
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+
+      - run: bun install
+
+      - name: Leer versión de package.json
+        id: pkg
+        shell: bash
+        run: |
+          VERSION=$(bun -e 'console.log(require("./package.json").version)')
+          if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+ ]]; then
+            echo "::error::package.json no tiene un campo 'version' válido (leído: '$VERSION')."
+            exit 1
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Fallar si el tag ya existe
+        shell: bash
+        env:
+          VERSION: ${{ steps.pkg.outputs.version }}
+        run: |
+          if git ls-remote --exit-code --tags origin "refs/tags/v$VERSION"; then
+            echo "::error::El tag v$VERSION ya existe. Subí la versión en package.json antes de lanzar el release."
+            exit 1
+          fi
+
+      - name: Build (tests + binario) # bun run build = bun test && bun build --compile
+        run: bun run build
+
+      - name: Crear tag y release con el binario
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.pkg.outputs.version }}
+        run: |
+          git tag "v$VERSION"
+          git push origin "v$VERSION"
+          gh release create "v$VERSION" --title "v$VERSION" --generate-notes weather.exe
